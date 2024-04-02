@@ -1,0 +1,66 @@
+name: CI
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: 0 12 * * 5
+
+jobs:
+  test-on-vim:
+    name: Vim ${{ matrix.vim_version }} on ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+
+        vim_version:
+          - v9.0.0449
+          - v9.1.0000
+          - head
+
+        download:
+          - available
+
+        include:
+          - os: ubuntu-latest
+            vim_version: head
+            download: never
+
+    uses: mityu/workflow-run-vim-themis/.github/workflows/run-themis.yml@v20240324
+    with:
+      vim_type: vim
+      vim_version: ${{ matrix.vim_version }}
+      os: ${{ matrix.os }}
+      download: ${{ matrix.download }}
+
+  test-on-neovim:
+    name: Neovim ${{ matrix.vim_version }} on ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+
+        vim_version:
+          - v0.8.0
+          - v0.9.0
+          - stable
+          - head
+
+        download:
+          - available
+
+        include:
+          - os: ubuntu-latest
+            vim_version: head
+            download: never
+
+    uses: mityu/workflow-run-vim-themis/.github/workflows/run-themis.yml@v20240324
+    with:
+      vim_type: neovim
+      vim_version: ${{ matrix.vim_version }}
+      os: ${{ matrix.os }}
+      download: ${{ matrix.download }}

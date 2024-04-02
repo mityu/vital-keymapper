@@ -1,0 +1,752 @@
+let s:assert = themis#helper('assert')
+let s:funcs = themis#helper('scope').funcs('autoload/vital/__vital__/Keymapper.vim')
+call themis#func_alias(s:funcs)
+call themis#helper('command').with(s:assert)
+
+
+Describe s:_replace_termcodes()
+  Before all
+    let ReplaceTermcodes = s:funcs._replace_termcodes
+  End
+
+  It escapes special characters.
+    Assert Equals(ReplaceTermcodes('<C-a>'), "\<C-a>")
+    Assert Equals(ReplaceTermcodes('<lt>C-a>'), '<C-a>')
+    Assert Equals(ReplaceTermcodes('<C-a>b<C-c>d'), "\<C-a>b\<C-c>d")
+    Assert Equals(ReplaceTermcodes('<Char-97>'), 'a')
+  End
+End
+
+
+Describe s:_keytrans()
+  Before all
+    let Keytrans = s:funcs._keytrans
+  End
+
+  It restores key notation from internal byte representation.
+    Assert Equals(Keytrans("\<C-a>"), '<C-A>')
+    Assert Equals(Keytrans("\<Plug>"), '<Plug>')
+    Assert Equals(Keytrans('<C-b>'), '<lt>C-b>')
+    Assert Equals(Keytrans("\<C-a>" . '<C-b>'), '<C-A><lt>C-b>')
+  End
+
+  It leaves <Nop> as it is.
+    Assert Equals(Keytrans('<Nop>'), '<Nop>')
+    Assert Equals(Keytrans('<nop>'), '<Nop>')
+    Assert Equals(Keytrans('<NOP>'), '<Nop>')
+    Assert Equals(Keytrans("\<C-a><Nop>ab"), '<C-A><Nop>ab')
+    Assert Equals(Keytrans('a<Nop>'), 'a<Nop>')
+    Assert Equals(Keytrans('<Nop>b'), '<Nop>b')
+  End
+
+End
+
+
+Describe s:_regularize_keys()
+  Before all
+    let RegularizeKeys = s:funcs._regularize_keys
+  End
+
+  It replaces internal byte representation of keys to key notations.
+    Assert Equals(RegularizeKeys("\<Plug>(foo-bar)"), '<Plug>(foo-bar)')
+    Assert Equals(RegularizeKeys("\<Ignore>"), '<Ignore>')
+  End
+
+  It keeps key notations as it is.
+    Assert Equals(RegularizeKeys('<Plug>(foo-bar)'), '<Plug>(foo-bar)')
+    Assert Equals(RegularizeKeys('<Ignore>'), '<Ignore>')
+    Assert Equals(RegularizeKeys('<C-a>'), '<C-A>')
+  End
+
+  It replaces <Char-xxx> to the equivalent character or notation.
+    Assert Equals(RegularizeKeys('<Char-1>'), '<C-A>')
+    Assert Equals(RegularizeKeys('<Char-97>'), 'a')
+
+    " HIRAGANA LETTER A
+    Assert Equals(RegularizeKeys('<Char-12354>'), nr2char(12354))
+  End
+
+End
+
+
+Describe s:_add_mapping()
+  Before all
+    let rhs_remap = {'rhs': {'mapto': 'RHS', 'remap': 1}}
+    let rhs_noremap = {'rhs': {'mapto': 'RHS', 'remap': 0}}
+    let AddMapping = s:funcs._add_mapping
+  End
+
+  It adds mappings with 1 {lhs} length.
+    let t = {}
+    call AddMapping(t, 'a', 'RHS', 0)
+    Assert Equals(t, {'a': rhs_noremap})
+
+    call AddMapping(t, 'a', 'RHS', 1)
+    Assert Equals(t, {'a': rhs_remap})
+  End
+
+  It adds mappings with multi {lhs} length.
+    let t = {}
+
+    call AddMapping(t, 'ab', 'RHS', 1)
+    Assert Equals(t, {'a': {'b': rhs_remap}})
+
+    call AddMapping(t, 'abc', 'RHS', 1)
+    Assert Equals(t, {'a': {'b': {'c': rhs_remap, 'rhs': rhs_remap.rhs}}})
+
+    let t = {}
+    call AddMapping(t, 'abc', 'RHS', 1)
+    call AddMapping(t, 'ad', 'RHS', 1)
+    Assert Equals(t, {'a': {'b': {'c': rhs_remap}, 'd': rhs_remap}})
+  End
+
+  It adds mappings with special characters in {lhs}.
+    let t = {}
+    call AddMapping(t, '<C-a>', 'RHS', 1)
+    Assert Equals(t, {'<C-A>': rhs_remap})
+
+    let t = {}
+    call AddMapping(t, "\<C-a>", 'RHS', 1)
+    Assert Equals(t, {'<C-A>': rhs_remap})
+
+    let t = {}
+    call AddMapping(t, '<Plug>ab', 'RHS', 1)
+    Assert Equals(t, {'<Plug>': {'a': {'b': rhs_remap}}})
+
+    let t = {}
+    call AddMapping(t, "\<Plug>ab", 'RHS', 1)
+    Assert Equals(t, {'<Plug>': {'a': {'b': rhs_remap}}})
+  End
+
+  It adds mappings with special characters in {rhs}.
+    let t = {}
+    call AddMapping(t, 'a', '<Plug>(ab)', 1)
+    Assert Equals(t, {'a': {'rhs': {'mapto': '<Plug>(ab)', 'remap': 1}}})
+
+    let t = {}
+    call AddMapping(t, 'a', "\<Plug>(ab)", 1)
+    Assert Equals(t, {'a': {'rhs': {'mapto': '<Plug>(ab)', 'remap': 1}}})
+  End
+
+  It makes {rhs} empty when only <Nop> is given as {rhs}.
+    let t = {}
+    call AddMapping(t, 'a', '<Nop>', 0)
+    Assert Equals(t, {'a': {'rhs': {'mapto': '', 'remap': 0}}})
+  End
+
+  It gives error when {lhs} is empty.
+    Throws /^vital: Keymapper: {lhs} is empty/ AddMapping({}, '', 'RHS', 1)
+  End
+
+End
+
+
+Describe s:_remove_mapping()
+  Before all
+    let rhs = {'mapto': '', 'remap': 1}
+    let RemoveMapping = s:funcs._remove_mapping
+  End
+
+  It removes a mapping with 1 {lhs} length.
+    let t = {'a': {'rhs': rhs}}
+    call RemoveMapping(t, 'a')
+    Assert Equals(t, {})
+  End
+
+  It removes a mapping with multiple {lhs} length.
+    let t = {'a': {'b': {'c': {'rhs': rhs}, 'rhs': rhs}}}
+    call RemoveMapping(t, 'ab')
+    Assert Equals(t, {'a': {'b': {'c': {'rhs': rhs}}}})
+  End
+
+  It removes mappings with non-escaped special characters in {lhs}.
+    let t = {'<Plug>': {'a': {'b': {'rhs': rhs}}}, '<C-A>': {'<C-B>': {'rhs': rhs}}}
+    let expected = {'<C-A>': {'<C-B>': {'rhs': rhs}}}
+    call RemoveMapping(t, '<Plug>ab')
+    Assert Equals(t, expected)
+  End
+
+  It removes mappings with escaped special characters in {lhs}.
+    let t = {'<Plug>': {'a': {'b': {'rhs': rhs}}}, '<C-A>': {'<C-B>': {'rhs': rhs}}}
+    let expected = {'<C-A>': {'<C-B>': {'rhs': rhs}}}
+    call RemoveMapping(t, "\<Plug>ab")
+    Assert Equals(t, expected)
+  End
+
+  It removes mappings with sequential non-escaped special characters in {lhs}.
+    let t = {'<C-A>': {'<C-B>': {'rhs': rhs}}}
+    call RemoveMapping(t, '<C-A><C-B>')
+    Assert Equals(t, {})
+  End
+
+  It removes mappings with sequential escaped special characters in {lhs}.
+    let t = {'<C-A>': {'<C-B>': {'rhs': rhs}}}
+    call RemoveMapping(t, "\<C-A>\<C-B>")
+    Assert Equals(t, {})
+  End
+
+  It removes mappings with sequential escaped and non-escaped special characters in {lhs}.
+    let t = {'<C-A>': {'<C-B>': {'rhs': rhs}}}
+    call RemoveMapping(t, "\<C-A><C-B>")
+    Assert Equals(t, {})
+  End
+
+  It removes only a leaf on mapping tree.
+    let t = {'a': {'b': {'rhs': rhs, 'c': {'rhs': rhs}}}}
+    call RemoveMapping(t, 'ab')
+    Assert Equals(t, {'a': {'b': {'c': {'rhs': rhs}}}})
+  End
+
+  It removes not only a leaf on mapping tree.
+    let t = {'a': {'b': {'c': {'rhs': rhs}}, 'd': {'rhs': rhs}}}
+    call RemoveMapping(t, 'abc')
+    Assert Equals(t, {'a': {'d': {'rhs': rhs}}})
+  End
+
+  It gives error when {lhs} is empty.
+    Throws /^vital: Keymapper: {lhs} is empty/ RemoveMapping({}, '')
+  End
+
+  It gives error when no mapping found.
+    let t = {'a': {'b': {'rhs': rhs}}}
+    Throws /^vital: Keymapper: No mappings found for/ RemoveMapping(t, 'X')
+    Throws /^vital: Keymapper: No mappings found for/ RemoveMapping(t, 'a')
+  End
+
+End
+
+
+Describe s:_lookup_mapping()
+  Before all
+    let AddMapping = s:funcs._add_mapping
+    let state = s:funcs.new().state
+  End
+
+  Context handle_count=false
+    Context timeouted=false
+      Before all
+        let LookupMapping = {t, keys -> s:funcs._lookup_mapping(t, keys, 0, 0)}
+      End
+
+      It finds the exact mapping.
+        let t = {}
+        call AddMapping(t, 'ab', 'RHS-ab', 0)
+        call AddMapping(t, 'cd', 'RHS-cd', 0)
+        call AddMapping(t, 'ef', 'RHS-ef', 0)
+
+        let resolved = {'state': state.done, 'resolved': 'RHS-ab', 'count': 0, 'count1': 1}
+        let r = LookupMapping(t, ['a', 'b'])
+        Assert Equals(r[0], resolved)
+        Assert Equals(r[1], [])
+
+        let r = LookupMapping(t, ['a', 'b', 'c'])
+        Assert Equals(r[0], resolved)
+        Assert Equals(r[1], ['c'])
+      End
+
+      It finds no mappings when there's no exact mappings.
+        let t = {}
+        call AddMapping(t, 'ab', 'RHS-ab', 0)
+        call AddMapping(t, 'cd', 'RHS-cd', 0)
+        call AddMapping(t, 'ef', 'RHS-ef', 0)
+
+        let resolved = {'state': state.done, 'resolved': 'x', 'count': 0, 'count1': 1}
+        let r = LookupMapping(t, ['x', 'y', 'z'])
+        Assert Equals(r[0], resolved)
+        Assert Equals(r[1], ['y', 'z'])
+      End
+
+      It does not recognize numbers as [count].
+        let resolved = {'state': state.done, 'resolved': '1', 'count': 0, 'count1': 1}
+        let r = LookupMapping({}, ['1', '2', 'a', 'b'])
+        Assert Equals(r[0], resolved)
+        Assert Equals(r[1], ['2', 'a', 'b'])
+      End
+
+      It does not determine mapping immediately.
+        let t = {}
+        call AddMapping(t, 'abc', 'RHS-abc', 0)
+        call AddMapping(t, 'abcd', 'RHS-abcd', 0)
+
+        let r = LookupMapping(t, ['a', 'b'])
+        Assert Equals(r[0].state, state.pending)
+        Assert Equals(r[0].resolved, '')
+        Assert Equals(r[1], ['a', 'b'])
+
+        let r = LookupMapping(t, ['a', 'b', 'c'])
+        Assert Equals(r[0].state, state.pending)
+        Assert Equals(r[0].resolved, '')
+        Assert Equals(r[1], ['a', 'b', 'c'])
+      End
+
+      It does not determine mapping immediately while resolving remappings.
+        let t = {}
+        call AddMapping(t, 'ab', 'cd', 1)
+        call AddMapping(t, 'cde', 'RHS-cde', 1)
+
+        let r = LookupMapping(t, ['a', 'b'])
+        Assert Equals(r[0].state, state.pending)
+        Assert Equals(r[0].resolved, '')
+        Assert Equals(r[1], ['a', 'b'])
+      End
+
+      It resolves re-mappings.
+        let t = {}
+        call AddMapping(t, 'ab', 'cdef', 1)
+        call AddMapping(t, 'cd', 'RHS-cd', 0)
+
+        let resolved = {'state': state.done, 'resolved': 'RHS-cd', 'count': 0, 'count1': 1}
+        let r = LookupMapping(t, ['a', 'b', 'x'])
+        Assert Equals(r[0], resolved)
+        Assert Equals(r[1], ['e', 'f', 'x'])
+      End
+
+      It resolves re-mappings with special keys.
+        let t = {}
+        call AddMapping(t, 'ab', '<Plug>(map)<Plug>(map2)', 1)
+        call AddMapping(t, '<Plug>(map)', 'RHS', 0)
+
+        let resolved = {'state': state.done, 'resolved': 'RHS', 'count': 0, 'count1': 1}
+        let r = LookupMapping(t, ['a', 'b', 'x'])
+        Assert Equals(r[0], resolved)
+        Assert Equals(r[1], ['<Plug>', '(', 'm', 'a', 'p', '2', ')', 'x'])
+      End
+
+      It gives error for recursive mapping.
+        let t = {}
+        call AddMapping(t, 'ab', 'cd', 1)
+        call AddMapping(t, 'cd', 'ab', 1)
+        Throws /^vital: Keymapper: Recursive mapping/ LookupMapping(t, ['a', 'b'])
+
+        " This behavior is different from Vim.
+        let t = {}
+        call AddMapping(t, 'ab', 'ab', 1)
+        Throws /^vital: Keymapper: Recursive mapping/ LookupMapping(t, ['a', 'b'])
+      End
+
+      It does not change original maptree and input queue.
+        let t = {}
+        call AddMapping(t, 'ab', 'RHS', 0)
+        let keys = ['a', 'b', 'c']
+        call LookupMapping(t, keys)
+        Assert Equals(t, {'a': {'b': {'rhs': {'mapto': 'RHS', 'remap': 0}}}})
+        Assert Equals(keys, ['a', 'b', 'c'])
+      End
+
+      Context when <Ignore> is given
+        It accepts mapping.
+          let t = {}
+          call AddMapping(t, 'ab', 'RHS-ab', 0)
+          call AddMapping(t, 'abcd', 'RHS-abcd', 0)
+
+          let resolved = {'state': state.done, 'resolved': 'RHS-ab', 'count': 0, 'count1': 1}
+          let r = LookupMapping(t, ['a', 'b', '<Ignore>'])
+          Assert Equals(r[0], resolved)
+          Assert Equals(r[1], ['<Ignore>'])
+        End
+
+        It aborts mapping lookup.
+          let t = {}
+          call AddMapping(t, 'abcd', 'RHS-abcd', 0)
+
+          let resolved = {'state': state.done, 'resolved': 'a', 'count': 0, 'count1': 1}
+          let r = LookupMapping(t, ['a', 'b', '<Ignore>'])
+          Assert Equals(r[0], resolved)
+          Assert Equals(r[1], ['b', '<Ignore>'])
+
+          let resolved = {'state': state.done, 'resolved': 'b', 'count': 0, 'count1': 1}
+          let r = LookupMapping(t, ['b', '<Ignore>'])
+          Assert Equals(r[0], resolved)
+          Assert Equals(r[1], ['<Ignore>'])
+        End
+
+        It does not search remapping using keys over <Ignore>.
+          let t = {}
+          call AddMapping(t, 'ab', 'cd', 1)
+          call AddMapping(t, 'cdef', 'RHS-cdef', 0)
+
+          let resolved = {'state': state.done, 'resolved': 'c', 'count': 0, 'count1': 1}
+          let r = LookupMapping(t, ['a', 'b', '<Ignore>', 'e', 'f'])
+          Assert Equals(r[0], resolved)
+          Assert Equals(r[1], ['d', '<Ignore>', 'e', 'f'])
+
+          let resolved = {'state': state.done, 'resolved': 'd', 'count': 0, 'count1': 1}
+          let r = LookupMapping(t, ['d', '<Ignore>', 'e', 'f'])
+          Assert Equals(r[0], resolved)
+          Assert Equals(r[1], ['<Ignore>', 'e', 'f'])
+
+          let resolved = {'state': state.done, 'resolved': 'e', 'count': 0, 'count1': 1}
+          let r = LookupMapping(t, ['<Ignore>', 'e', 'f'])
+          Assert Equals(r[0], resolved)
+          Assert Equals(r[1], ['f'])
+        End
+
+      End
+
+    End
+
+    Context timeouted=true
+      Before all
+        let LookupMapping = {t, keys -> s:funcs._lookup_mapping(t, keys, 0, 1)}
+      End
+
+      It determines mapping from found {rhs} candidate.
+        let t = {}
+        call AddMapping(t, 'ab', 'RHS-ab', 0)
+        call AddMapping(t, 'abcd', 'RHS-abcd', 0)
+
+        let resolved = {'state': state.done, 'resolved': 'a', 'count': 0, 'count1': 1}
+        let r = LookupMapping(t, ['a'])
+        Assert Equals(r[0], resolved)
+        Assert Equals(r[1], [])
+
+        let resolved = {'state': state.done, 'resolved': 'RHS-ab', 'count': 0, 'count1': 1}
+        let r = LookupMapping(t, ['a', 'b'])
+        Assert Equals(r[0], resolved)
+        Assert Equals(r[1], [])
+
+        let resolved = {'state': state.done, 'resolved': 'RHS-ab', 'count': 0, 'count1': 1}
+        let r = LookupMapping(t, ['a', 'b', 'c'])
+        Assert Equals(r[0], resolved)
+        Assert Equals(r[1], ['c'])
+      End
+
+    End
+
+  End
+
+  Context handle_count=true
+    Context timeouted=false
+      Before all
+        let LookupMapping = {t, keys -> s:funcs._lookup_mapping(t, keys, 1, 0)}
+      End
+
+      It recognize numbers as [count].
+        let resolved = {'state': state.done, 'resolved': 'x', 'count': 321, 'count1': 321}
+        let r = LookupMapping({}, ['3', '2', '1', 'x'])
+        Assert Equals(r[0], resolved)
+        Assert Equals(r[1], [])
+
+        let t = {}
+        call AddMapping(t, 'ab', 'RHS-ab', 0)
+        let resolved = {'state': state.done, 'resolved': 'RHS-ab', 'count': 56, 'count1': 56}
+        let r = LookupMapping(t, ['5', '6', 'a', 'b'])
+        Assert Equals(r[0], resolved)
+        Assert Equals(r[1], [])
+      End
+
+      It combines typed [count] and [count] in {rhs}.
+        let t = {}
+        call AddMapping(t, 'ab', '23RHS-ab', 0)
+        let resolved = {'state': state.done, 'resolved': 'RHS-ab', 'count': 423, 'count1': 423}
+        let r = LookupMapping(t, ['4', 'a', 'b'])
+        Assert Equals(r[0], resolved)
+        Assert Equals(r[1], [])
+      End
+
+      It combines [count] in {rhs} when resolving remappings.
+        let t = {}
+        call AddMapping(t, 'ab', '23cd', 1)
+        call AddMapping(t, 'cd', '45RHS-cd', 0)
+
+        let resolved =
+          \ {'state': state.done, 'resolved': 'RHS-cd', 'count': 62345, 'count1': 62345}
+        let r = LookupMapping(t, ['6', 'a', 'b'])
+        Assert Equals(r[0], resolved)
+        Assert Equals(r[1], [])
+      End
+
+      It finds mapping with numbers at the head.
+        let t = {}
+        call AddMapping(t, '12', 'RHS-12', 0)
+
+        let resolved = {'state': state.done, 'resolved': 'RHS-12', 'count': 0, 'count1': 1}
+        let r = LookupMapping(t, ['1', '2'])
+        Assert Equals(r[0], resolved)
+        Assert Equals(r[1], [])
+
+        let resolved = {'state': state.done, 'resolved': 'RHS-12', 'count': 3, 'count1': 3}
+        let r = LookupMapping(t, ['3', '1', '2'])
+        Assert Equals(r[0], resolved)
+        Assert Equals(r[1], [])
+      End
+
+      Context when <Ignore> is given
+        It throws away [count].
+          let r = LookupMapping({}, ['1', '2', '<Ignore>'])
+          Assert Equals(r[0].state, state.pending)
+          Assert Equals(r[1], [])
+        End
+
+      End
+
+    End
+
+    Context timeouted=true
+      Before all
+        let LookupMapping = {t, keys -> s:funcs._lookup_mapping(t, keys, 1, 1)}
+      End
+
+      It determins mapping from just from given inputs.
+        let t = {}
+        call AddMapping(t, 'abc', 'RHS', 0)
+
+        let resolved = {'state': state.done, 'resolved': 'a', 'count': 12, 'count1': 12}
+        let r = LookupMapping(t, ['1', '2', 'a', 'b'])
+        Assert Equals(r[0], resolved)
+        Assert Equals(r[1], ['b'])
+      End
+
+      It throws away [count].
+        let r = LookupMapping({}, ['1', '2'])
+        Assert Equals(r[0].state, state.pending)
+        Assert Equals(r[1], [])
+      End
+
+    End
+
+  End
+
+End
+
+
+Describe s:_set_option()
+  Before all
+    let SetOption = s:funcs._set_option
+  End
+
+  It sets an option value.
+    let opts = {'option-key': 1}
+    call SetOption(opts, 'option-key', 0)
+    Assert Equals(opts, {'option-key': 0})
+  End
+
+  It gives error for unexisting options value.
+    let opts = {'option-key': 1}
+    Throws /^vital: Keymapper: option not found:/ SetOption(opts, 'unexists', 0)
+  End
+
+End
+
+
+Describe s:_split_into_keyseq()
+  Before all
+    let SplitIntoKeyseq = s:funcs._split_into_keyseq
+  End
+
+  It converts a string into a list of characters.
+    Assert Equals(SplitIntoKeyseq('abcxyz'), ['a', 'b', 'c', 'x', 'y', 'z'])
+  End
+
+  It left '<ESC>' as it is.
+    Assert Equals(SplitIntoKeyseq('<ESC>'), ['<ESC>'])
+  End
+End
+
+
+Describe s:_separate_count_and_map()
+  Before all
+    let SeparateCountAndMap = s:funcs._separate_count_and_map
+  End
+
+  It separates [count] from key sequence.
+    Assert Equals(SeparateCountAndMap('123abc'), ['123', 'abc'])
+    Assert Equals(SeparateCountAndMap('123'), ['123', ''])
+    Assert Equals(SeparateCountAndMap('abc'), ['', 'abc'])
+  End
+
+End
+
+
+Describe {module}
+  Before all
+    let GetModes = {module -> keys(module._modes)->sort()}
+    let GetMaptree = {module, mode -> module._modes[mode].maptree}
+  End
+
+  Describe .add_mode()
+    Before each
+      let module = s:funcs.new()
+    End
+
+    It adds modes.
+      Assert Equals(GetModes(module), [])
+
+      call module.add_mode('mode1')
+      Assert Equals(GetModes(module), ['mode1']->sort())
+
+      call module.add_mode('mode2')
+      Assert Equals(GetModes(module), ['mode1', 'mode2']->sort())
+    End
+
+    It does nothing when the given mode already exists.
+      call module.add_mode('mode1')
+      Assert Empty(module._modes.mode1.maptree)
+      let module._modes.mode1.maptree.dummy_element = 'foo'
+
+      call module.add_mode('mode1')
+      Assert Equals(module._modes.mode1.maptree, {'dummy_element': 'foo'})
+    End
+
+  End
+
+  Describe .remove_mode()
+    Before each
+      let module = s:funcs.new()
+    End
+
+    It removes the given existing mode.
+      call module.add_mode('mode1')
+      call module.add_mode('mode2')
+      call module.add_mode('mode3')
+      call module.remove_mode('mode2')
+      Assert Equals(GetModes(module), ['mode1', 'mode3']->sort())
+    End
+
+    It gives an error when removing an unexisting mode.
+      call module.add_mode('mode1')
+      call module.add_mode('mode2')
+      call module.add_mode('mode3')
+      Throws /^vital: Keymapper: mode not found: unexisting-mode/
+        \ module.remove_mode('unexisting-mode')
+    End
+
+  End
+
+  Describe .set_mode()
+    Before each
+      let module = s:funcs.new()
+    End
+
+    It changes curent mode.
+      call module.add_mode('mode1')
+
+      Assert Equals(module._mode, '')
+      call module.set_mode('mode1')
+      Assert Equals(module._mode, 'mode1')
+    End
+
+    It give an error when undefined mode is given.
+      Throws /^vital: Keymapper: mode not found:/ module.set_mode('not-exists')
+    End
+
+    It doesn't change current mode when undefined mode is given.
+      call module.add_mode('mode1')
+      call module.add_mode('mode2')
+      call module.set_mode('mode1')
+      Assert Equals(module._mode, 'mode1')
+      try
+        call module.set_mode('not-exists')
+      catch
+        " Ignore
+      endtry
+      Assert Equals(module._mode, 'mode1')
+    End
+  End
+
+  Describe .add_mapping
+    Before each
+      let module = s:funcs.new()
+    End
+
+    It adds a mapping to given mode.
+      call module.add_mode('mode1')
+      call module.add_mode('mode2')
+      call module.set_mode('mode1')
+
+      Assert Equals(GetMaptree(module, 'mode1'), {})
+      Assert Equals(GetMaptree(module, 'mode2'), {})
+      call module.add_mapping('mode1', 'a', 'RHS')
+      Assert Equals(GetMaptree(module, 'mode1'), {'a': {'rhs': {'mapto': 'RHS', 'remap': 0}}})
+      Assert Equals(GetMaptree(module, 'mode2'), {})
+    End
+
+    It give an error for unexisting mode.
+      call module.add_mode('mode1')
+      call module.set_mode('mode1')
+
+      Throws /^vital: Keymapper: mode not found: not-exists/
+        \ module.add_mapping('not-exists', 'lhs', 'rhs')
+    End
+  End
+
+  Describe .remove_mapping()
+    Before each
+      let module = s:funcs.new()
+    End
+
+    It removes a mapping from given mode.
+      call module.add_mode('mode1')
+      call module.add_mode('mode2')
+      call module.set_mode('mode1')
+
+      call module.add_mapping('mode1', 'a', 'RHS-a')
+      call module.add_mapping('mode2', 'b', 'RHS-b')
+      Assert NotEmpty(GetMaptree(module, 'mode1'))
+      Assert NotEmpty(GetMaptree(module, 'mode2'))
+      call module.remove_mapping('mode1', 'a')
+      Assert Empty(GetMaptree(module, 'mode1'))
+      Assert NotEmpty(GetMaptree(module, 'mode2'))
+    End
+
+    It give an error for unexisting mode.
+      call module.add_mode('mode1')
+      call module.set_mode('mode1')
+
+      Throws /^vital: Keymapper: mode not found: not-exists/
+        \ module.remove_mapping('not-exists', 'lhs')
+    End
+  End
+
+  Describe .append_keys()
+    Before each
+      let module = s:funcs.new()
+      call module.add_mode('test')
+      call module.set_mode('test')
+    End
+
+    It appends the key sequence to queue in the form of list of characters.
+      Assert Equals(module._input_queue, [])
+      call module.append_keys('abc')
+      Assert Equals(module._input_queue, ['a', 'b', 'c'])
+      call module.append_keys('xyz')
+      Assert Equals(module._input_queue, ['a', 'b', 'c', 'x', 'y', 'z'])
+    End
+
+    It treats '<ESC>' as the key sequence of '<', 'E', 'S', 'C', '>'.
+      call module.append_keys('<ESC>')
+      Assert Equals(module._input_queue, ['<lt>', 'E', 'S', 'C', '>'])
+    End
+
+    It treats "\<ESC>" as the one escape key.
+      call module.append_keys("\<ESC>")
+      Assert Equals(module._input_queue, ['<Esc>'])
+    End
+
+  End
+
+  Describe .lookup_mapping()
+    Before each
+      let module = s:funcs.new()
+      call module.add_mode('test')
+      call module.set_mode('test')
+    End
+
+    It remembers [count] correctly.
+      call module.add_mapping('test', 'ab', 'cd', {'remap': 1})
+      call module.add_mapping('test', 'cde', 'RHS-cde')
+
+      call module.append_keys('6ab')
+      let map = module.lookup_mapping()
+      Assert Equals(map.state, module.state.pending)
+      Assert NotEmpty(module._input_queue)
+
+      call module.append_keys('e')
+      let map = module.lookup_mapping()
+      Assert Equals(map,
+        \ {'state': module.state.done, 'resolved': 'RHS-cde', 'count': 6, 'count1': 6})
+      Assert Empty(module._input_queue)
+    End
+
+  End
+End

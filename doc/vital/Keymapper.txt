@@ -1,0 +1,156 @@
+*vital/Keymapper.txt*	Vital module that emulates Vim's key-mapping system
+
+Author: mityu <mityu.mail@gmail.com>
+License: MIT License
+
+==============================================================================
+CONTENTS					*Vital.Keymapper-contents*
+
+INTRODUCTION				|Vital.Keymapper-introduction|
+REQUIREMENTS				|Vital.Keymapper-requirements|
+FUNCTIONS				|Vital.Keymapper-functions|
+  MODULE FUNCTIONS			|Vital.Keymapper-module-functions|
+  OBJECT MEMBERS			|Vital.Keymapper-object-members|
+EXAMPLES				|Vital.Keymapper-examples|
+
+
+==============================================================================
+INTRODUCTION				*Vital.Keymapper-introduction*
+
+This is a vital module that provides an emulation of Vim's key-mapping system.
+
+
+==============================================================================
+REQUIREMENTS				*Vital.Keymapper-requirements*
+
+- Vim 9.0.0449 or later
+- Neovim v0.8.0 or later
+
+==============================================================================
+FUNCTIONS				*Vital.Keymapper-functions*
+
+------------------------------------------------------------------------------
+MODULE FUNCTIONS			*Vital.Keymapper-module-functions*
+
+				*Vital.Keymapper-module-functions-new()*
+new()
+	Creates new Keymapper object.
+	See |Vital.Keymapper-object-members| for the member functions.
+
+
+------------------------------------------------------------------------------
+OBJECT MEMBERS				*Vital.Keymapper-object-members*
+
+List of member constants and functions of the Keymapper object returned by
+|Vital.Keymapper-module-functions-new()|.
+
+					*Vital.Keymapper-object-constants*
+Constants~
+
+					*Vital.Keymapper-object-state*
+state
+	A |Dict| consist of constants that indicates the result status of
+	key-mapping resolution.  The following is the list of available keys
+	and the description of the status that each key indicates.
+		done		Mapping is resolved.
+
+		pending		Mapping cannot be uniquely determined.
+				Additional key inputs are required to find the
+				exact one mapping.
+
+
+					*Vital.Keymapper-object-functions*
+Functions~
+
+					*Vital.Keymapper-object-add_mode()*
+add_mode({mode} [, {opts})
+	Create a new mode named {mode}.  {mode} must be a |String|.  If {mode}
+	already exists, this function does nothing.
+	{opts} is a |Dict| for specifying some options for the {mode}.  See
+	|Vital.Keymapper-object-set_mode_options()| for the available options.
+
+					*Vital.Keymapper-object-remove_mode()*
+remove_mode({mode})
+	Remove a mode named {mode}.  If {mode} does not exist, an error is
+	given.
+
+					*Vital.Keymapper-object-set_mode()*
+set_mode({mode})
+	Set the current mode to {mode}.  If {mode} does not exist, an error is
+	given.
+
+					*Vital.Keymapper-object-add_mapping()*
+add_mapping({mode}, {lhs}, {rhs} [, {opts})
+	Add a mapping to {mode}.  If {mode} does not exist, an error is given.
+	{lhs} and {rhs} must be a |String| and the meaning of them is same to
+	|:map|.  In {lhs} and {rhs}, you can use the both form of '<...>' and
+	"\<...>" for special characters.
+	{opts} is a |Dict| with the following keys:
+		remap	(|Boolean|, optional)
+			When this value is true, {rhs} will be remapped.  This
+			is like |:map|.
+			When this value is false, {rhs} won't be remapped.
+			This is like |:noremap|.
+
+			Default is false.
+
+				*Vital.Keymapper-object-remove_mapping()*
+remove_mapping({mode}, {lhs})
+	Remove mapping of {lhs} for {mode}.  You can use the both form of
+	'<...>' and "\<...>" for special characters in {lhs} regardless of the
+	style you used with |Vital.Keymapper-object-add_mapping()|.
+
+				*Vital.Keymapper-object-set_mode_options()*
+set_mode_options({mode}, {opts})
+set_mode_options({mode}, {key}, {value})
+	Set mode options for {mode}.  {opt} is a |Dict| whose key is option
+	name and whose value is the value to be set.  {key} is a |String| of
+	option name and {value} is the value to be set.  The available options
+	are:
+		handle_count	(|Number| or |Boolean|)
+			When this option is true, numbers are treated as
+			[count] like in normal mode.  Otherwise, numbers are
+			treated just a input like in insert mode.
+
+			Default: 1
+
+					*Vital.Keymapper-object-append_keys()*
+append_keys({keys})
+	Add {keys} to the input queue like |feedkeys()|.  {keys} must be a
+	|String| and it is interpreted in the same way that |feedkeys()| does.
+	In other words, "\<ESC>" means the escape key but "<ESC>" means the
+	sequence of five characters, "<", "E", "S", "C", and ">".
+
+				*Vital.Keymapper-object-lookup_mapping()*
+lookup_mapping([{timeout}])
+	Find mapping using the input queue and return the result.  The result
+	is a |Dict| consist of these keys:
+		state		(|Number|)
+				One of |Vital.Keymapper-object-state|.
+
+		resolved	(|String|)
+				Resolved keys.  If keys are mapped, this will
+				be {rhs}, and if keys are not mapped, this
+				will be the keys.  Valid only when "state" is
+				"done".
+
+		count		(|Number|)
+				The |v:count| alternative.  Valid only when
+				"state" is "done".
+
+		count1		(|Number|)
+				The |v:count1| alternative.  Valid only when
+				"state" is "done".
+
+	If {timeout} is true, this function searches mapping in the way that
+	Vim does on timeout.  See also: 'timeout'.
+
+
+==============================================================================
+EXAMPLES					*Vital.Keymapper-examples*
+
+TODO: Write
+
+
+==============================================================================
+vim:tw=78:fo=tcq2mM:ts=8:ft=help:norl
