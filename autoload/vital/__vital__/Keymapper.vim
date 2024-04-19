@@ -42,6 +42,10 @@ function s:module.set_mode(mode) abort
   let self._mode = a:mode
 endfunction
 
+function s:module.get_mode() abort
+  return self._mode
+endfunction
+
 function s:module.add_mapping(mode, lhs, rhs, opt = {}) abort
   if !has_key(self._modes, a:mode)
     throw 'vital: Keymapper: mode not found: ' . a:mode
@@ -83,6 +87,13 @@ endfunction
 " '<ESC>' means the character sequence of '<', 'E', 'S', 'C', and '>'.
 function s:module.append_keys(keys) abort
   let self._input_queue += s:_split_into_keyseq(s:_keytrans(a:keys))
+endfunction
+
+" Similar to append_keys() function, but different from it, this function
+" inserts keys at the head of input queue.
+function s:module.prepend_keys(keys) abort
+  let self._input_queue =
+    \ s:_split_into_keyseq(s:_keytrans(a:keys)) + self._input_queue
 endfunction
 
 function s:module.lookup_mapping(timeouted = 0)

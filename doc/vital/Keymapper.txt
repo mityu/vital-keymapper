@@ -79,6 +79,10 @@ set_mode({mode})
 	Set the current mode to {mode}.  If {mode} does not exist, an error is
 	given.
 
+					*Vital.Keymapper-object-get_mode()*
+get_mode()
+	Get the current mode.
+
 					*Vital.Keymapper-object-add_mapping()*
 add_mapping({mode}, {lhs}, {rhs} [, {opts})
 	Add a mapping to {mode}.  If {mode} does not exist, an error is given.
@@ -120,6 +124,11 @@ append_keys({keys})
 	|String| and it is interpreted in the same way that |feedkeys()| does.
 	In other words, "\<ESC>" means the escape key but "<ESC>" means the
 	sequence of five characters, "<", "E", "S", "C", and ">".
+
+					*Vital.Keymapper-object-prepend_keys()*
+prepend_keys({keys})
+	Same as |Vital.Keymapper-object-append_keys()| function except that
+	this function inserts {keys} at the head of the input queue.
 
 				*Vital.Keymapper-object-lookup_mapping()*
 lookup_mapping([{timeout}])
