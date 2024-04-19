@@ -725,6 +725,33 @@ Describe {module}
 
   End
 
+  Describe .prepend_keys()
+    Before each
+      let module = s:funcs.new()
+      call module.add_mode('test')
+      call module.set_mode('test')
+    End
+
+    It prepends the key sequence to queue in the form of list of characters.
+      Assert Equals(module._input_queue, [])
+      call module.prepend_keys('abc')
+      Assert Equals(module._input_queue, ['a', 'b', 'c'])
+      call module.prepend_keys('xyz')
+      Assert Equals(module._input_queue, ['x', 'y', 'z', 'a', 'b', 'c'])
+    End
+
+    It treats '<ESC>' as the key sequence of '<', 'E', 'S', 'C', '>'.
+      call module.prepend_keys('<ESC>')
+      Assert Equals(module._input_queue, ['<lt>', 'E', 'S', 'C', '>'])
+    End
+
+    It treats "\<ESC>" as the one escape key.
+      call module.prepend_keys("\<ESC>")
+      Assert Equals(module._input_queue, ['<Esc>'])
+    End
+
+  End
+
   Describe .lookup_mapping()
     Before each
       let module = s:funcs.new()

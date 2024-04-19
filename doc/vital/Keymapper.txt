@@ -125,6 +125,11 @@ append_keys({keys})
 	In other words, "\<ESC>" means the escape key but "<ESC>" means the
 	sequence of five characters, "<", "E", "S", "C", and ">".
 
+					*Vital.Keymapper-object-prepend_keys()*
+prepend_keys({keys})
+	Same as |Vital.Keymapper-object-append_keys()| function except that
+	this function inserts {keys} at the head of the input queue.
+
 				*Vital.Keymapper-object-lookup_mapping()*
 lookup_mapping([{timeout}])
 	Find mapping using the input queue and return the result.  The result

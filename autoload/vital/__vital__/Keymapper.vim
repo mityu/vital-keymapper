@@ -89,6 +89,13 @@ function s:module.append_keys(keys) abort
   let self._input_queue += s:_split_into_keyseq(s:_keytrans(a:keys))
 endfunction
 
+" Similar to append_keys() function, but different from it, this function
+" inserts keys at the head of input queue.
+function s:module.prepend_keys(keys) abort
+  let self._input_queue =
+    \ s:_split_into_keyseq(s:_keytrans(a:keys)) + self._input_queue
+endfunction
+
 function s:module.lookup_mapping(timeouted = 0)
   if !has_key(self._modes, self._mode)
     throw 'vital: Keymapper: mode not found: ' . self._mode
