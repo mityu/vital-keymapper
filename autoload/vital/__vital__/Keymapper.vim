@@ -42,6 +42,10 @@ function s:module.set_mode(mode) abort
   let self._mode = a:mode
 endfunction
 
+function s:module.get_mode() abort
+  return self._mode
+endfunction
+
 function s:module.add_mapping(mode, lhs, rhs, opt = {}) abort
   if !has_key(self._modes, a:mode)
     throw 'vital: Keymapper: mode not found: ' . a:mode

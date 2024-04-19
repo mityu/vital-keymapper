@@ -79,6 +79,10 @@ set_mode({mode})
 	Set the current mode to {mode}.  If {mode} does not exist, an error is
 	given.
 
+					*Vital.Keymapper-object-get_mode()*
+get_mode()
+	Get the current mode.
+
 					*Vital.Keymapper-object-add_mapping()*
 add_mapping({mode}, {lhs}, {rhs} [, {opts})
 	Add a mapping to {mode}.  If {mode} does not exist, an error is given.
