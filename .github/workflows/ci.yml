@@ -28,7 +28,7 @@ jobs:
             vim_version: head
             download: never
 
-    uses: mityu/workflow-run-vim-themis/.github/workflows/run-themis.yml@v20240324
+    uses: mityu/workflow-run-vim-themis/.github/workflows/run-themis.yml@v20250912
     with:
       vim_type: vim
       vim_version: ${{ matrix.vim_version }}
@@ -58,7 +58,7 @@ jobs:
             vim_version: head
             download: never
 
-    uses: mityu/workflow-run-vim-themis/.github/workflows/run-themis.yml@v20240324
+    uses: mityu/workflow-run-vim-themis/.github/workflows/run-themis.yml@v20250912
     with:
       vim_type: neovim
       vim_version: ${{ matrix.vim_version }}
